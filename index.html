@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>💋 PrivateRoom</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
+<style>
+  :root{
+    --bg:#0a0608;--surface:#130d10;--surface2:#1e1318;--border:#2e1f27;
+    --accent:#c9507a;--gold:#d4a654;--text:#f0e6eb;--text-muted:#7a5f6a;
+    --male:#7c9cff;--female:#ff7eb3;--bubble-m:#1a2040;--bubble-f:#3d1228;
+    --glow:rgba(201,80,122,0.15);
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  html,body{height:100%;background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;overflow:hidden;}
+  body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:999;
+    background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");opacity:0.4;}
+  .blob{position:fixed;border-radius:50%;filter:blur(80px);pointer-events:none;z-index:0;}
+  .blob-1{width:400px;height:400px;background:rgba(201,80,122,0.08);top:-100px;right:-100px;animation:d1 12s ease-in-out infinite;}
+  .blob-2{width:300px;height:300px;background:rgba(124,58,237,0.07);bottom:-80px;left:-80px;animation:d2 15s ease-in-out infinite;}
+  @keyframes d1{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(-30px,30px) scale(1.1)}}
+  @keyframes d2{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(30px,-20px) scale(1.05)}}
+
+  /* LOADING */
+  #loading{position:fixed;inset:0;z-index:200;background:var(--bg);display:flex;align-items:center;justify-content:center;flex-direction:column;gap:16px;}
+  .spin{width:42px;height:42px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 0.8s linear infinite;}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  #loading p{color:var(--text-muted);font-size:0.82rem;}
+
+  /* ENTRY */
+  #entry{position:fixed;inset:0;z-index:100;display:none;align-items:center;justify-content:center;flex-direction:column;gap:28px;background:radial-gradient(ellipse at center,#1a0812 0%,#0a0608 70%);}
+  .logo{font-family:'Playfair Display',serif;font-size:clamp(1.9rem,6vw,3.2rem);letter-spacing:0.05em;}
+  .logo span{color:var(--accent);font-style:italic;}
+  .logo-sub{color:var(--text-muted);font-size:0.78rem;letter-spacing:0.12em;text-transform:uppercase;}
+  .gender-cards{display:flex;gap:18px;flex-wrap:wrap;justify-content:center;}
+  .gc{width:152px;padding:24px 16px;border-radius:20px;border:1px solid var(--border);background:var(--surface);cursor:pointer;text-align:center;transition:all 0.3s;position:relative;overflow:hidden;}
+  .gc::before{content:'';position:absolute;inset:0;opacity:0;transition:opacity 0.3s;border-radius:20px;}
+  .gc.male::before{background:radial-gradient(circle at 50% 0%,rgba(124,156,255,0.16),transparent 70%);}
+  .gc.female::before{background:radial-gradient(circle at 50% 0%,rgba(255,126,179,0.16),transparent 70%);}
+  .gc:hover::before{opacity:1;}.gc:hover{transform:translateY(-4px);border-color:var(--accent);}
+  .gc .icon{font-size:2.6rem;display:block;margin-bottom:10px;}
+  .gc .label{font-family:'Playfair Display',serif;font-size:1rem;}
+  .gc.male .label{color:var(--male);}.gc.female .label{color:var(--female);}
+  .gc .sub{font-size:0.7rem;color:var(--text-muted);margin-top:4px;}
+  .entry-note{color:var(--text-muted);font-size:0.74rem;text-align:center;max-width:270px;line-height:1.7;}
+
+  /* WAITING */
+  #waiting{position:fixed;inset:0;z-index:90;display:none;align-items:center;justify-content:center;flex-direction:column;gap:20px;background:radial-gradient(ellipse at center,#1a0812 0%,#0a0608 70%);}
+  .pulse-ring{width:74px;height:74px;border-radius:50%;border:2px solid var(--accent);position:relative;animation:po 1.5s ease-out infinite;}
+  .pulse-ring::after{content:'💋';position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:1.8rem;}
+  @keyframes po{0%{box-shadow:0 0 0 0 rgba(201,80,122,0.5)}100%{box-shadow:0 0 0 40px rgba(201,80,122,0)}}
+  #waiting h2{font-family:'Playfair Display',serif;font-size:1.3rem;}
+  #waiting p{color:var(--text-muted);font-size:0.8rem;}
+  .rlbox{background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:11px 15px;display:flex;gap:9px;align-items:center;max-width:88vw;}
+  .rlbox input{background:none;border:none;outline:none;color:var(--gold);font-size:0.76rem;flex:1;min-width:0;font-family:'DM Sans',sans-serif;}
+  .rlbox button{background:var(--accent);border:none;color:#fff;padding:5px 12px;border-radius:8px;cursor:pointer;font-size:0.76rem;white-space:nowrap;transition:opacity 0.2s;}
+  .rlbox button:hover{opacity:0.85;}
+
+  /* CHAT */
+  #chat{position:fixed;inset:0;z-index:80;display:none;flex-direction:column;}
+  .chat-header{padding:11px 15px;display:flex;align-items:center;gap:11px;border-bottom:1px solid var(--border);background:rgba(10,6,8,0.88);backdrop-filter:blur(12px);z-index:2;flex-shrink:0;}
+  .hav{width:38px;height:38px;border-radius:50%;font-size:1.15rem;display:flex;align-items:center;justify-content:center;border:1.5px solid var(--border);flex-shrink:0;}
+  .hav.m{background:rgba(124,156,255,0.1);border-color:var(--male);}.hav.f{background:rgba(255,126,179,0.1);border-color:var(--female);}
+  .hinfo{flex:1;}.hinfo .hname{font-family:'Playfair Display',serif;font-size:0.93rem;}
+  .hinfo .hstatus{font-size:0.66rem;color:var(--text-muted);margin-top:1px;}
+  .sdot{display:inline-block;width:6px;height:6px;border-radius:50%;background:#555;margin-right:4px;vertical-align:middle;}
+  .sdot.on{background:#4ade80;box-shadow:0 0 5px #4ade80;}
+  .pside{display:flex;align-items:center;gap:7px;}
+  .pchip{padding:3px 9px;border-radius:20px;font-size:0.66rem;border:1px solid var(--border);background:var(--surface2);color:var(--text-muted);}
+
+  #messages{flex:1;overflow-y:auto;padding:15px 13px;display:flex;flex-direction:column;gap:8px;scroll-behavior:smooth;}
+  #messages::-webkit-scrollbar{width:3px;}
+  #messages::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px;}
+
+  .msg-row{display:flex;gap:7px;max-width:82%;animation:pi 0.22s cubic-bezier(.34,1.56,.64,1);}
+  @keyframes pi{from{opacity:0;transform:translateY(7px) scale(0.95)}to{opacity:1;transform:none}}
+  .msg-row.mine{align-self:flex-end;flex-direction:row-reverse;}.msg-row.theirs{align-self:flex-start;}
+  .mav{width:26px;height:26px;border-radius:50%;font-size:0.78rem;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:auto;}
+  .mav.m{background:rgba(124,156,255,0.1);}.mav.f{background:rgba(255,126,179,0.1);}
+  .bubble{padding:9px 13px;border-radius:16px;font-size:0.87rem;line-height:1.5;word-break:break-word;max-width:100%;}
+  .mine   .bubble{background:var(--bubble-f);border-bottom-right-radius:4px;color:#fce8f0;}
+  .theirs .bubble{background:var(--bubble-m);border-bottom-left-radius:4px;color:#e8eeff;}
+  .mine.male-msg   .bubble{background:var(--bubble-m);border-bottom-right-radius:4px;color:#e8eeff;}
+  .mine.female-msg .bubble{background:var(--bubble-f);border-bottom-right-radius:4px;color:#fce8f0;}
+  .btime{font-size:0.59rem;color:var(--text-muted);margin-top:2px;text-align:right;}
+
+  .typing-row{display:flex;gap:7px;align-items:center;align-self:flex-start;opacity:0.7;}
+  .typing-bubble{background:var(--surface2);border:1px solid var(--border);padding:9px 13px;border-radius:16px;border-bottom-left-radius:4px;display:flex;gap:4px;align-items:center;}
+  .tdot{width:5px;height:5px;border-radius:50%;background:var(--text-muted);animation:bl 1.2s infinite;}
+  .tdot:nth-child(2){animation-delay:0.2s}.tdot:nth-child(3){animation-delay:0.4s}
+  @keyframes bl{0%,60%,100%{opacity:0.3}30%{opacity:1}}
+
+  .sys-msg{text-align:center;font-size:0.69rem;color:var(--text-muted);padding:3px 0;}
+  .sys-msg span{background:var(--surface2);border:1px solid var(--border);padding:3px 10px;border-radius:20px;}
+
+  .input-area{padding:11px 13px;border-top:1px solid var(--border);background:rgba(10,6,8,0.93);backdrop-filter:blur(10px);flex-shrink:0;display:flex;flex-direction:column;gap:8px;}
+  .emoji-tray{display:flex;flex-wrap:wrap;gap:3px;max-height:0;overflow:hidden;transition:max-height 0.35s ease;}
+  .emoji-tray.open{max-height:180px;overflow-y:auto;}
+  .emoji-tray::-webkit-scrollbar{width:3px;}
+  .emoji-tray::-webkit-scrollbar-thumb{background:var(--border);}
+  .ebtn{font-size:1.15rem;background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:4px 6px;cursor:pointer;transition:transform 0.15s;line-height:1;}
+  .ebtn:hover{transform:scale(1.3);}
+  .input-row{display:flex;gap:8px;align-items:flex-end;}
+  .input-row textarea{flex:1;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:13px;padding:9px 13px;font-family:'DM Sans',sans-serif;font-size:0.87rem;resize:none;outline:none;max-height:108px;line-height:1.5;min-height:40px;transition:border-color 0.2s;}
+  .input-row textarea:focus{border-color:var(--accent);}
+  .input-row textarea::placeholder{color:var(--text-muted);}
+  .icon-btn{width:40px;height:40px;border-radius:11px;border:1px solid var(--border);background:var(--surface2);cursor:pointer;font-size:1.1rem;display:flex;align-items:center;justify-content:center;transition:all 0.2s;flex-shrink:0;}
+  .icon-btn:hover{background:var(--surface);border-color:var(--accent);}.icon-btn.active{background:var(--accent);border-color:var(--accent);}
+  .send-btn{width:40px;height:40px;border-radius:11px;border:none;background:linear-gradient(135deg,var(--accent),#a0325a);cursor:pointer;font-size:1rem;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all 0.2s;box-shadow:0 4px 14px rgba(201,80,122,0.3);}
+  .send-btn:hover{transform:scale(1.06);box-shadow:0 6px 20px rgba(201,80,122,0.45);}.send-btn:active{transform:scale(0.94);}
+
+  #disc-banner{display:none;padding:7px;text-align:center;background:rgba(180,40,40,0.28);font-size:0.76rem;border-bottom:1px solid rgba(180,40,40,0.4);flex-shrink:0;}
+  #disc-banner.show{display:block;}
+
+  #toast{position:fixed;top:16px;left:50%;transform:translateX(-50%) translateY(-60px);background:var(--surface2);border:1px solid var(--accent);color:var(--text);padding:9px 17px;border-radius:11px;font-size:0.8rem;z-index:1000;transition:transform 0.3s cubic-bezier(.34,1.56,.64,1);box-shadow:0 8px 28px var(--glow);}
+  #toast.show{transform:translateX(-50%) translateY(0);}
+
+  @media(max-width:480px){.msg-row{max-width:90%;}.gender-cards{gap:12px;}.gc{width:140px;}}
+</style>
+</head>
+<body>
+<div class="blob blob-1"></div>
+<div class="blob blob-2"></div>
+<div id="toast"></div>
+
+<!-- LOADING -->
+<div id="loading">
+  <div class="spin"></div>
+  <p>Connecting… 🔥</p>
+</div>
+
+<!-- ENTRY -->
+<div id="entry">
+  <div class="logo">Private<span>Room</span> 💋</div>
+  <div class="logo-sub">Just the two of you 🕯️</div>
+  <div class="gender-cards">
+    <div class="gc male" onclick="choose('male')">
+      <span class="icon">👨</span>
+      <div class="label">He / Him</div>
+      <div class="sub">💪🍆🔥 King</div>
+    </div>
+    <div class="gc female" onclick="choose('female')">
+      <span class="icon">👩</span>
+      <div class="label">She / Her</div>
+      <div class="sub">🌹💅🍑 Queen</div>
+    </div>
+  </div>
+  <p class="entry-note">Both open the same link 🔗<br/>One picks 👨, other picks 👩 — done! 💌</p>
+</div>
+
+<!-- WAITING -->
+<div id="waiting">
+  <div class="pulse-ring"></div>
+  <h2>Waiting for your partner… 🕯️</h2>
+  <p>Share this link with them 👇</p>
+  <div class="rlbox">
+    <input id="room-link" readonly/>
+    <button onclick="copyLink()">Copy 🔗</button>
+  </div>
+  <p style="color:var(--text-muted);font-size:0.71rem;margin-top:6px;">They open the link &amp; pick the other gender 💋</p>
+</div>
+
+<!-- CHAT -->
+<div id="chat">
+  <div id="disc-banner">⚠️ Partner disconnected. Waiting for them to return…</div>
+  <div class="chat-header">
+    <div class="hav" id="my-av"></div>
+    <div class="hinfo">
+      <div class="hname" id="my-name"></div>
+      <div class="hstatus"><span class="sdot on" id="sdot"></span><span id="stext">Connected 🔥</span></div>
+    </div>
+    <div class="pside">
+      <div class="hav" id="par-av"></div>
+      <div class="pchip" id="par-name"></div>
+    </div>
+  </div>
+  <div id="messages"></div>
+  <div class="input-area">
+    <div class="emoji-tray" id="emoji-tray"></div>
+    <div class="input-row">
+      <button class="icon-btn" id="etoggle" onclick="toggleEmoji()">😈</button>
+      <textarea id="msg-input" rows="1" placeholder="Say something naughty… 😏" onkeydown="handleKey(event)" oninput="autoResize(this);sendTyping();"></textarea>
+      <button class="send-btn" onclick="sendMsg()">💌</button>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { initializeApp }   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getDatabase, ref, set, push, onValue, onDisconnect, serverTimestamp, get }
+  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBBF4DHE8jfSGGYVRf9W9MvFwEfW0lZ-jw",
+  authDomain: "chatapp-7afcc.firebaseapp.com",
+  projectId: "chatapp-7afcc",
+  storageBucket: "chatapp-7afcc.firebasestorage.app",
+  messagingSenderId: "444203743042",
+  appId: "1:444203743042:web:362f75c7fb8aa501463adb",
+  databaseURL: "https://chatapp-7afcc-default-rtdb.firebaseio.com"
+};
+
+const app = initializeApp(firebaseConfig);
+const db  = getDatabase(app);
+
+const EMOJIS = [
+  '😍','😘','😏','😈','🥵','🔥','💋','❤️','💕','💞','🍑','🍆','🍒','🍓','🌹',
+  '🌸','🌺','💐','🫦','👅','💦','🤤','😻','🥰','😜','🤭','🫣','😩','😮‍💨','🥂',
+  '💅','👑','🍾','🎀','🎁','💎','✨','⭐','🌙','🕯️','🩷','🩸','👙','🩲','🔞',
+  '🫀','🩴','💏','👫','🤍','🖤','💜','💙','❤️‍🔥','💌','🫂','🤝','💪','🙈','😳',
+  '🤫','😋','🥴','😵','🤩','🫰','🤙','✌️','💯','🎯','🔑','🛏️','🚿','🫐','🍫',
+];
+
+let myGender = null, partnerOn = false;
+let typingTimer = null, isTyping = false;
+let typingIndicatorEl = null, partnerTypingTimer = null;
+let renderedKeys = new Set();
+
+// Init
+setTimeout(() => {
+  document.getElementById('loading').style.display = 'none';
+  showEl('entry');
+  buildEmojiTray();
+}, 900);
+
+// Gender choose
+window.choose = async function(gender) {
+  const snap = await get(ref(db, `presence/${gender}`));
+  if (snap.exists() && snap.val().online) {
+    showToast('This role is already taken! 😅 Use the other one.');
+    return;
+  }
+  myGender = gender;
+  document.getElementById('entry').style.display = 'none';
+  setupUI();
+
+  // Presence
+  const presRef = ref(db, `presence/${gender}`);
+  await set(presRef, { online: true, ts: serverTimestamp() });
+  onDisconnect(presRef).set({ online: false, ts: serverTimestamp() });
+
+  const other = gender === 'male' ? 'female' : 'male';
+
+  // Watch partner presence
+  onValue(ref(db, `presence/${other}`), snap => {
+    const v = snap.val();
+    if (v && v.online) {
+      if (!partnerOn) onPartnerJoined();
+      else { partnerOn = true; document.getElementById('disc-banner').classList.remove('show'); }
+    } else {
+      if (partnerOn) onPartnerLeft();
+    }
+  });
+
+  // Watch messages
+  onValue(ref(db, 'messages'), snap => {
+    snap.forEach(child => {
+      if (!renderedKeys.has(child.key)) {
+        renderedKeys.add(child.key);
+        renderMsg(child.val(), child.val().gender === myGender);
+      }
+    });
+  });
+
+  // Watch partner typing
+  onValue(ref(db, `typing/${other}`), snap => {
+    snap.val() === true ? showTypingIndicator() : hideTypingIndicator();
+  });
+
+  // Check partner already online
+  const ps = await get(ref(db, `presence/${other}`));
+  if (ps.exists() && ps.val().online) onPartnerJoined();
+  else showWaiting();
+};
+
+function setupUI() {
+  const other = myGender === 'male' ? 'female' : 'male';
+  const me = myGender === 'male' ? '👨' : '👩';
+  const pa = other    === 'male' ? '👨' : '👩';
+  const mc = myGender === 'male' ? 'm' : 'f';
+  const pc = other    === 'male' ? 'm' : 'f';
+  document.getElementById('my-av').textContent  = me;
+  document.getElementById('my-av').className    = 'hav ' + mc;
+  document.getElementById('my-name').textContent= myGender === 'male' ? '👨 He / Him' : '👩 She / Her';
+  document.getElementById('par-av').textContent = pa;
+  document.getElementById('par-av').className   = 'hav ' + pc;
+  document.getElementById('par-name').textContent = other === 'male' ? '👨 He / Him' : '👩 She / Her';
+}
+
+function showWaiting() {
+  document.getElementById('room-link').value = window.location.href;
+  showEl('waiting');
+}
+
+function onPartnerJoined() {
+  partnerOn = true;
+  document.getElementById('waiting').style.display = 'none';
+  document.getElementById('disc-banner').classList.remove('show');
+  showEl('chat', true);
+  document.getElementById('sdot').className = 'sdot on';
+  document.getElementById('stext').textContent = 'Connected 🔥';
+  const msgs = document.getElementById('messages');
+  if (!msgs.querySelector('.sys-msg')) addSysMsg('🔐 Connected! This room is private & real-time 💋');
+  showToast('Partner joined! 🎉💞');
+}
+
+function onPartnerLeft() {
+  partnerOn = false;
+  document.getElementById('sdot').className = 'sdot';
+  document.getElementById('stext').textContent = 'Offline 😔';
+  document.getElementById('disc-banner').classList.add('show');
+  addSysMsg('💔 Partner disconnected…');
+}
+
+// Send message
+window.sendMsg = async function() {
+  const inp  = document.getElementById('msg-input');
+  const text = inp.value.trim();
+  if (!text) return;
+  if (!partnerOn) { showToast('Partner not connected yet 😔'); return; }
+  await push(ref(db, 'messages'), { gender: myGender, text, time: Date.now() });
+  inp.value = '';
+  autoResize(inp);
+  stopTyping();
+};
+
+function renderMsg(msg, isMine) {
+  hideTypingIndicator();
+  const messages = document.getElementById('messages');
+  const row = document.createElement('div');
+  row.className = 'msg-row ' + (isMine ? 'mine' : 'theirs') + ' ' + (msg.gender === 'male' ? 'male-msg' : 'female-msg');
+  const av = document.createElement('div');
+  av.className = 'mav ' + (msg.gender === 'male' ? 'm' : 'f');
+  av.textContent = msg.gender === 'male' ? '👨' : '👩';
+  const wrap   = document.createElement('div');
+  const bubble = document.createElement('div');
+  bubble.className = 'bubble';
+  bubble.textContent = msg.text;
+  const btime = document.createElement('div');
+  btime.className = 'btime';
+  btime.textContent = new Date(msg.time).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+  wrap.appendChild(bubble);
+  wrap.appendChild(btime);
+  row.appendChild(av);
+  row.appendChild(wrap);
+  messages.appendChild(row);
+  messages.scrollTop = messages.scrollHeight;
+}
+
+function addSysMsg(txt) {
+  const d = document.createElement('div');
+  d.className = 'sys-msg';
+  d.innerHTML = `<span>${txt}</span>`;
+  document.getElementById('messages').appendChild(d);
+  const m = document.getElementById('messages');
+  m.scrollTop = m.scrollHeight;
+}
+
+// Typing
+function showTypingIndicator() {
+  if (typingIndicatorEl) { clearTimeout(partnerTypingTimer); partnerTypingTimer = setTimeout(hideTypingIndicator, 4000); return; }
+  const messages = document.getElementById('messages');
+  const other = myGender === 'male' ? 'female' : 'male';
+  typingIndicatorEl = document.createElement('div');
+  typingIndicatorEl.className = 'typing-row';
+  typingIndicatorEl.innerHTML = `<div class="mav ${other==='male'?'m':'f'}">${other==='male'?'👨':'👩'}</div><div class="typing-bubble"><div class="tdot"></div><div class="tdot"></div><div class="tdot"></div></div>`;
+  messages.appendChild(typingIndicatorEl);
+  messages.scrollTop = messages.scrollHeight;
+  partnerTypingTimer = setTimeout(hideTypingIndicator, 4000);
+}
+function hideTypingIndicator() {
+  if (typingIndicatorEl) { typingIndicatorEl.remove(); typingIndicatorEl = null; }
+  clearTimeout(partnerTypingTimer);
+}
+window.sendTyping = function() {
+  if (!partnerOn || !myGender) return;
+  set(ref(db, `typing/${myGender}`), true);
+  isTyping = true;
+  clearTimeout(typingTimer);
+  typingTimer = setTimeout(stopTyping, 2500);
+};
+function stopTyping() {
+  if (myGender) set(ref(db, `typing/${myGender}`), false);
+  isTyping = false;
+}
+
+// Emoji
+function buildEmojiTray() {
+  const tray = document.getElementById('emoji-tray');
+  EMOJIS.forEach(e => {
+    const b = document.createElement('button');
+    b.className = 'ebtn'; b.textContent = e;
+    b.onclick = () => {
+      const inp = document.getElementById('msg-input');
+      const p = inp.selectionStart;
+      inp.value = inp.value.slice(0,p) + e + inp.value.slice(inp.selectionEnd);
+      inp.selectionStart = inp.selectionEnd = p + e.length;
+      inp.focus(); autoResize(inp);
+    };
+    tray.appendChild(b);
+  });
+}
+window.toggleEmoji = function() {
+  document.getElementById('emoji-tray').classList.toggle('open');
+  document.getElementById('etoggle').classList.toggle('active');
+};
+
+// Utils
+window.handleKey   = e => { if (e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMsg();} };
+window.autoResize  = el => { el.style.height='auto'; el.style.height=Math.min(el.scrollHeight,108)+'px'; };
+window.copyLink    = () => {
+  navigator.clipboard.writeText(document.getElementById('room-link').value)
+    .then(()=>showToast('Link copied! 🔗 Share with bae 💌'))
+    .catch(()=>showToast('Copy manually 💌'));
+};
+
+let toastT;
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastT); toastT = setTimeout(()=>t.classList.remove('show'),3000);
+}
+window.showToast = showToast;
+
+function showEl(id, flex) {
+  const el = document.getElementById(id);
+  el.style.display = flex ? 'flex' : 'flex';
+}
+
+window.addEventListener('beforeunload', () => {
+  if (myGender) {
+    set(ref(db, `typing/${myGender}`), false);
+    set(ref(db, `presence/${myGender}`), { online: false, ts: Date.now() });
+  }
+});
+</script>
+</body>
+</html>
