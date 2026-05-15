@@ -522,24 +522,24 @@ setTimeout(() => {
 }, 900);
 
 // ── Gender choose ────────────────────────────────────────────
-window.choose = async function(gender) {
+window.choose = function(gender) {
   myGender = gender;
   document.getElementById('entry').style.display = 'none';
   setupUI();
-
-  // Presence
-  const presRef = ref(db, `presence/${gender}`);
-  await set(presRef, { online:true, ts:serverTimestamp() });
-  onDisconnect(presRef).set({ online:false, ts:serverTimestamp() });
+  showChatOffline();
 
   const other = gender === 'male' ? 'female' : 'male';
+
+  // Presence (fire and forget)
+  const presRef = ref(db, `presence/${gender}`);
+  set(presRef, { online:true, ts:serverTimestamp() });
+  onDisconnect(presRef).set({ online:false, ts:serverTimestamp() });
 
   // Partner presence
   onValue(ref(db, `presence/${other}`), snap => {
     const v = snap.val();
     if (v && v.online) {
       if (!partnerOn) onPartnerJoined();
-      else { partnerOn = true; document.getElementById('disc-banner').classList.remove('show'); }
     } else {
       if (partnerOn) onPartnerLeft();
     }
@@ -555,7 +555,7 @@ window.choose = async function(gender) {
     });
   });
 
-  // ★ LIVE TYPING — real characters from partner ★
+  // Live typing
   onValue(ref(db, `livetyping/${other}`), snap => {
     const val = snap.val();
     if (val && val.text !== undefined && val.text !== '') {
@@ -564,11 +564,6 @@ window.choose = async function(gender) {
       hideLiveTyping();
     }
   });
-
-  // Check partner already online
-  const ps = await get(ref(db, `presence/${other}`));
-  if (ps.exists() && ps.val().online) onPartnerJoined();
-  else showChatOffline();
 };
 
 // ── UI setup ─────────────────────────────────────────────────
