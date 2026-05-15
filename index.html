@@ -573,7 +573,7 @@ window.choose = async function(gender) {
   // Check partner already online
   const ps = await get(ref(db, `presence/${other}`));
   if (ps.exists() && ps.val().online) onPartnerJoined();
-  else showWaiting();
+  else showChatOffline();
 };
 
 // ── UI setup ─────────────────────────────────────────────────
@@ -588,9 +588,11 @@ function setupUI() {
 }
 
 // ── Waiting / Connected ───────────────────────────────────────
-function showWaiting() {
-  document.getElementById('room-link').value = window.location.href;
-  showEl('waiting');
+function showChatOffline() {
+  document.getElementById('waiting').style.display = 'none';
+  showEl('chat', true);
+  document.getElementById('sdot').className = 'sdot';
+  document.getElementById('stext').textContent = 'Partner offline — messages will be delivered 📩';
 }
 
 function onPartnerJoined() {
@@ -599,20 +601,16 @@ function onPartnerJoined() {
   document.getElementById('disc-banner').classList.remove('show');
   showEl('chat', true);
   document.getElementById('sdot').className  = 'sdot on';
-  document.getElementById('stext').textContent = 'Connected 🔥';
-  const msgs = document.getElementById('messages');
-  if (!msgs.querySelector('.sys-msg'))
-    addSysMsg('🔐 Connected! Everything you type, they see live 💕');
-  showToast('Your partner joined! 🎉💞');
+  document.getElementById('stext').textContent = 'Online 🔥';
+  showToast('Partner is online! 🎉💞');
 }
 
 function onPartnerLeft() {
   partnerOn = false;
   document.getElementById('sdot').className  = 'sdot';
-  document.getElementById('stext').textContent = 'Offline 😔';
-  document.getElementById('disc-banner').classList.add('show');
+  document.getElementById('stext').textContent = 'Partner offline — messages will be delivered 📩';
+  document.getElementById('disc-banner').classList.remove('show');
   hideLiveTyping();
-  addSysMsg('💔 Partner disconnected…');
 }
 
 // ── Send message ──────────────────────────────────────────────
@@ -620,9 +618,7 @@ window.sendMsg = async function() {
   const inp  = document.getElementById('msg-input');
   const text = inp.value.trim();
   if (!text) return;
-  if (!partnerOn) { showToast('Partner not connected yet 😔'); return; }
 
-  // Clear live typing for my gender
   await set(ref(db, `livetyping/${myGender}`), { text: '', ts: Date.now() });
 
   await push(ref(db, 'messages'), { gender:myGender, text, time:Date.now() });
@@ -632,7 +628,7 @@ window.sendMsg = async function() {
 
 // ── Live typing broadcast ─────────────────────────────────────
 window.broadcastLiveTyping = function() {
-  if (!partnerOn || !myGender) return;
+  if (!myGender) return;
   const text = document.getElementById('msg-input').value;
   set(ref(db, `livetyping/${myGender}`), { text, ts: Date.now() });
 
