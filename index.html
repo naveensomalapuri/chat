@@ -523,11 +523,6 @@ setTimeout(() => {
 
 // ── Gender choose ────────────────────────────────────────────
 window.choose = async function(gender) {
-  const snap = await get(ref(db, `presence/${gender}`));
-  if (snap.exists() && snap.val().online) {
-    showToast('This role is already taken! Use the other one.');
-    return;
-  }
   myGender = gender;
   document.getElementById('entry').style.display = 'none';
   setupUI();
