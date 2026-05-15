@@ -598,7 +598,7 @@ html,body { height:100%; font-family:'Inter',sans-serif; background:var(--bg2); 
               onkeydown="handleKey(event)"
               oninput="autoResize(this);broadcastLiveTyping()"></textarea>
           </div>
-          <button class="send-btn" onclick="sendMsg()">
+          <button class="send-btn" onpointerdown="event.preventDefault()" onclick="sendMsg()">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
               <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
             </svg>
@@ -820,9 +820,10 @@ window.sendMsg=async function(){
   const inp=document.getElementById('msg-input');
   const text=inp.value.trim();
   if(!text)return;
+  inp.value='';autoResize(inp);
+  inp.focus();
   set(ref(db,`livetyping/${myGender}`),{text:'',ts:Date.now()});
   await push(ref(db,'messages'),{gender:myGender,text,time:Date.now()});
-  inp.value='';autoResize(inp);
   if(!partnerOn) showToast('Message sent — delivered when partner comes online');
 };
 
