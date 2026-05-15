@@ -325,6 +325,17 @@ html,body { height:100%; font-family:'Inter',sans-serif; background:var(--bg2); 
   transition:width 0.2s; width:0%;
 }
 
+/* Tick marks */
+.ticks { display:inline-flex; align-items:center; margin-left:3px; }
+.tick {
+  display:inline-block; width:9px; height:9px;
+  border-right:2px solid var(--text3); border-bottom:2px solid var(--text3);
+  transform:rotate(45deg) translate(-1px,-2px);
+}
+.ticks.sent   .tick      { border-color:var(--text3); }
+.ticks.seen   .tick      { border-color:#4fc3f7; }
+.ticks .tick2 { margin-left:-5px; }
+
 /* System */
 .sys-msg { text-align:center; padding:6px 0; }
 .sys-msg span {
@@ -563,6 +574,8 @@ html,body { height:100%; font-family:'Inter',sans-serif; background:var(--bg2); 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getDatabase, ref, set, push, remove, onValue, onDisconnect, serverTimestamp }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+import { getStorage, ref as sref, uploadBytesResumable, getDownloadURL }
+  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyBBF4DHE8jfSGGYVRf9W9MvFwEfW0lZ-jw",
@@ -573,8 +586,9 @@ const firebaseConfig = {
   appId: "1:444203743042:web:362f75c7fb8aa501463adb",
   databaseURL: "https://chatapp-7afcc-default-rtdb.firebaseio.com"
 };
-const app = initializeApp(firebaseConfig);
-const db  = getDatabase(app);
+const app     = initializeApp(firebaseConfig);
+const db      = getDatabase(app);
+const storage = getStorage(app);
 
 const EMOJIS = [
   '😊','😄','😂','🤣','😍','😘','😏','😈','🥵','🔥',
@@ -684,7 +698,7 @@ window.choose=function(gender){
         renderedKeys.add(child.key);
         const msg=child.val();
         const isMine=msg.gender===myGender;
-        renderMsg(msg,isMine);
+        renderMsg(msg,isMine,child.key);
         if(!isMine){
           playMsgSound();
           const notifText=msg.fileType?`📎 ${msg.fileName}`:msg.text;
@@ -702,6 +716,22 @@ window.choose=function(gender){
     const v=snap.val();
     if(v&&v.text)showLiveTyping(v.text);
     else hideLiveTyping();
+  });
+
+  // Mark incoming messages as seen & update ticks
+  onValue(ref(db,'messages'),snap=>{
+    snap.forEach(child=>{
+      const msg=child.val();
+      // If this is partner's message and I'm viewing → mark seen
+      if(msg.gender!==myGender && !msg.seen){
+        set(ref(db,`messages/${child.key}/seen`),true);
+      }
+      // If it's my message and now marked seen → turn ticks blue
+      if(msg.gender===myGender && msg.seen){
+        const el=document.querySelector(`.ticks[data-key="${child.key}"]`);
+        if(el){ el.className='ticks seen'; }
+      }
+    });
   });
 
   onValue(ref(db,`calls/${gender}`),snap=>{
@@ -752,36 +782,45 @@ window.sendMsg=async function(){
   if(!partnerOn) showToast('Message sent — delivered when partner comes online');
 };
 
-// File / image upload
+// File / image upload via Firebase Storage
 window.handleFile=async function(e){
   const file=e.target.files[0];
   if(!file)return;
   e.target.value='';
 
-  const MAX=5*1024*1024; // 5 MB limit
-  if(file.size>MAX){showToast('File too large — max 5 MB');return;}
+  const MAX=20*1024*1024;
+  if(file.size>MAX){showToast('File too large — max 20 MB');return;}
 
+  const isImage=file.type.startsWith('image/');
+  const isVideo=file.type.startsWith('video/');
   showToast('Uploading…');
 
-  const reader=new FileReader();
-  reader.onload=async ev=>{
-    const dataUrl=ev.target.result;
-    const isImage=file.type.startsWith('image/');
-    const isVideo=file.type.startsWith('video/');
-    const msg={
-      gender:myGender,
-      time:Date.now(),
-      fileType: isImage?'image': isVideo?'video':'file',
-      fileName:file.name,
-      fileSize:fmtSize(file.size),
-      fileData:dataUrl,
-      text:''
-    };
-    await push(ref(db,'messages'),msg);
-    if(!partnerOn) showToast('File sent — delivered when partner comes online');
-    else showToast('File sent');
-  };
-  reader.readAsDataURL(file);
+  const path=`chat-files/${Date.now()}_${file.name}`;
+  const storageRef=sref(storage,path);
+  const task=uploadBytesResumable(storageRef,file);
+
+  task.on('state_changed',
+    snap=>{
+      const pct=Math.round(snap.bytesTransferred/snap.totalBytes*100);
+      showToast(`Uploading… ${pct}%`);
+    },
+    err=>{ showToast('Upload failed: '+err.message); },
+    async ()=>{
+      const url=await getDownloadURL(task.snapshot.ref);
+      const msg={
+        gender:myGender,
+        time:Date.now(),
+        fileType:isImage?'image':isVideo?'video':'file',
+        fileName:file.name,
+        fileSize:fmtSize(file.size),
+        fileUrl:url,
+        text:''
+      };
+      await push(ref(db,'messages'),msg);
+      if(!partnerOn) showToast('File sent — delivered when partner comes online');
+      else showToast('File sent');
+    }
+  );
 };
 
 function fmtSize(bytes){
@@ -823,7 +862,7 @@ function escapeHtml(s){
 }
 
 // Render message
-function renderMsg(msg,isMine){
+function renderMsg(msg,isMine,msgKey){
   hideLiveTyping();
   const msgs=document.getElementById('messages');
   const sameAuthor=lastGender===msg.gender;
@@ -843,12 +882,12 @@ function renderMsg(msg,isMine){
 
   if(msg.fileType==='image'){
     const img=document.createElement('img');
-    img.src=msg.fileData;img.alt=msg.fileName;
-    img.onclick=()=>{window.open(msg.fileData,'_blank');};
+    img.src=msg.fileUrl;img.alt=msg.fileName;
+    img.onclick=()=>{window.open(msg.fileUrl,'_blank');};
     bubble.appendChild(img);
   } else if(msg.fileType==='video'){
     const vid=document.createElement('video');
-    vid.src=msg.fileData;vid.controls=true;
+    vid.src=msg.fileUrl;vid.controls=true;
     vid.style.cssText='max-width:100%;max-height:220px;border-radius:8px;display:block;';
     bubble.appendChild(vid);
   } else if(msg.fileType==='file'){
@@ -859,7 +898,7 @@ function renderMsg(msg,isMine){
     const name=document.createElement('div');name.className='file-name';name.textContent=msg.fileName;
     const size=document.createElement('div');size.className='file-size';size.textContent=msg.fileSize;
     const dl=document.createElement('a');dl.className='file-dl';
-    dl.href=msg.fileData;dl.download=msg.fileName;dl.textContent='Download';
+    dl.href=msg.fileUrl;dl.target='_blank';dl.textContent='Download';
     info.appendChild(name);info.appendChild(size);info.appendChild(dl);
     fb.appendChild(icon);fb.appendChild(info);
     bubble.appendChild(fb);
@@ -871,6 +910,14 @@ function renderMsg(msg,isMine){
   const t=document.createElement('span');t.className='btime';
   t.textContent=fmtTime(msg.time);
   meta.appendChild(t);
+
+  if(isMine){
+    const ticks=document.createElement('span');
+    ticks.className='ticks '+(msg.seen?'seen':'sent');
+    ticks.dataset.key=msgKey||'';
+    ticks.innerHTML='<span class="tick"></span><span class="tick tick2"></span>';
+    meta.appendChild(ticks);
+  }
 
   wrap.appendChild(bubble);
   wrap.appendChild(meta);
