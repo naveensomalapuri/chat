@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<html lang="en" data-theme="light">
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
@@ -495,7 +495,7 @@ html,body { height:100%; font-family:'Inter',sans-serif; background:var(--bg2); 
       <div class="sidebar-header">
         <h2>Chats</h2>
         <div class="sidebar-header-actions">
-          <button class="hdr-btn" onclick="toggleTheme()" id="theme-btn" title="Toggle theme">☀️</button>
+          <button class="hdr-btn" onclick="toggleTheme()" id="theme-btn" title="Toggle theme">🌙</button>
         </div>
       </div>
       <div class="search-box">
@@ -616,8 +616,7 @@ html,body { height:100%; font-family:'Inter',sans-serif; background:var(--bg2); 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getDatabase, ref, set, push, remove, onValue, onDisconnect, serverTimestamp }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
-import { getStorage, ref as sref, uploadBytesResumable, getDownloadURL }
-  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
+
 
 const firebaseConfig = {
   apiKey: "AIzaSyBBF4DHE8jfSGGYVRf9W9MvFwEfW0lZ-jw",
@@ -628,9 +627,8 @@ const firebaseConfig = {
   appId: "1:444203743042:web:362f75c7fb8aa501463adb",
   databaseURL: "https://chatapp-7afcc-default-rtdb.firebaseio.com"
 };
-const app     = initializeApp(firebaseConfig);
-const db      = getDatabase(app);
-const storage = getStorage(app);
+const app = initializeApp(firebaseConfig);
+const db  = getDatabase(app);
 
 const EMOJIS = [
   '😊','😄','😂','🤣','😍','😘','😏','😈','🥵','🔥',
@@ -700,9 +698,9 @@ setTimeout(()=>{
 // Theme
 window.toggleTheme=function(){
   const h=document.documentElement;
-  const dark=h.getAttribute('data-theme')==='dark';
-  h.setAttribute('data-theme',dark?'light':'dark');
-  document.getElementById('theme-btn').textContent=dark?'☀️':'🌙';
+  const isDark=h.getAttribute('data-theme')==='dark';
+  h.setAttribute('data-theme',isDark?'light':'dark');
+  document.getElementById('theme-btn').textContent=isDark?'🌙':'☀️';
 };
 
 // Mobile nav
@@ -834,40 +832,72 @@ window.handleFile=async function(e){
   if(!file)return;
   e.target.value='';
 
-  const MAX=20*1024*1024;
-  if(file.size>MAX){showToast('File too large — max 20 MB');return;}
-
   const isImage=file.type.startsWith('image/');
   const isVideo=file.type.startsWith('video/');
-  showToast('Uploading…');
 
-  const path=`chat-files/${Date.now()}_${file.name}`;
-  const storageRef=sref(storage,path);
-  const task=uploadBytesResumable(storageRef,file);
+  // Size limits
+  const MAX_IMG  = 5*1024*1024;  // 5 MB images (will be compressed)
+  const MAX_FILE = 1*1024*1024;  // 1 MB other files (Firebase DB limit)
 
-  task.on('state_changed',
-    snap=>{
-      const pct=Math.round(snap.bytesTransferred/snap.totalBytes*100);
-      showToast(`Uploading… ${pct}%`);
-    },
-    err=>{ showToast('Upload failed: '+err.message); },
-    async ()=>{
-      const url=await getDownloadURL(task.snapshot.ref);
-      const msg={
-        gender:myGender,
-        time:Date.now(),
-        fileType:isImage?'image':isVideo?'video':'file',
-        fileName:file.name,
-        fileSize:fmtSize(file.size),
-        fileUrl:url,
-        text:''
-      };
-      await push(ref(db,'messages'),msg);
-      if(!partnerOn) showToast('File sent — delivered when partner comes online');
-      else showToast('File sent');
+  if(isImage && file.size>MAX_IMG){ showToast('Image too large — max 5 MB'); return; }
+  if(!isImage && file.size>MAX_FILE){ showToast('File too large — max 1 MB. Use images for bigger media.'); return; }
+
+  showToast('Processing…');
+
+  try{
+    let dataUrl;
+    if(isImage){
+      dataUrl = await compressImage(file, 1200, 0.82);
+    } else {
+      dataUrl = await readFileAsDataURL(file);
     }
-  );
+
+    const msg={
+      gender:myGender,
+      time:Date.now(),
+      fileType:isImage?'image':isVideo?'video':'file',
+      fileName:file.name,
+      fileSize:fmtSize(file.size),
+      fileData:dataUrl,
+      text:''
+    };
+    await push(ref(db,'messages'),msg);
+    if(!partnerOn) showToast('File sent — delivered when partner comes online');
+    else showToast('File sent ✓');
+  } catch(err){
+    showToast('Failed: '+err.message);
+  }
 };
+
+function readFileAsDataURL(file){
+  return new Promise((res,rej)=>{
+    const r=new FileReader();
+    r.onload=ev=>res(ev.target.result);
+    r.onerror=()=>rej(new Error('Could not read file'));
+    r.readAsDataURL(file);
+  });
+}
+
+function compressImage(file, maxPx, quality){
+  return new Promise((res,rej)=>{
+    const img=new Image();
+    const url=URL.createObjectURL(file);
+    img.onload=()=>{
+      URL.revokeObjectURL(url);
+      let {width:w,height:h}=img;
+      if(w>maxPx||h>maxPx){
+        if(w>h){h=Math.round(h*maxPx/w);w=maxPx;}
+        else{w=Math.round(w*maxPx/h);h=maxPx;}
+      }
+      const c=document.createElement('canvas');
+      c.width=w;c.height=h;
+      c.getContext('2d').drawImage(img,0,0,w,h);
+      res(c.toDataURL('image/jpeg',quality));
+    };
+    img.onerror=()=>rej(new Error('Could not load image'));
+    img.src=url;
+  });
+}
 
 function fmtSize(bytes){
   if(bytes<1024)return bytes+' B';
@@ -926,25 +956,36 @@ function renderMsg(msg,isMine,msgKey){
 
   const bubble=document.createElement('div');bubble.className='bubble';
 
+  const src = msg.fileData || msg.fileUrl || '';
   if(msg.fileType==='image'){
     const img=document.createElement('img');
-    img.src=msg.fileUrl;img.alt=msg.fileName;
-    img.onclick=()=>{window.open(msg.fileUrl,'_blank');};
+    img.src=src; img.alt=msg.fileName||'image';
+    img.onclick=()=>{ window.open(src,'_blank'); };
     bubble.appendChild(img);
+    // Download button under image
+    const dl=document.createElement('a');
+    dl.className='file-dl'; dl.href=src; dl.download=msg.fileName||'image';
+    dl.textContent='⬇ Download';
+    dl.style.display='inline-block'; dl.style.marginTop='6px';
+    bubble.appendChild(dl);
   } else if(msg.fileType==='video'){
     const vid=document.createElement('video');
-    vid.src=msg.fileUrl;vid.controls=true;
+    vid.src=src; vid.controls=true;
     vid.style.cssText='max-width:100%;max-height:220px;border-radius:8px;display:block;';
     bubble.appendChild(vid);
+    const dl=document.createElement('a');
+    dl.className='file-dl'; dl.href=src; dl.download=msg.fileName||'video';
+    dl.textContent='⬇ Download'; dl.style.display='inline-block'; dl.style.marginTop='6px';
+    bubble.appendChild(dl);
   } else if(msg.fileType==='file'){
     const fb=document.createElement('div');fb.className='file-bubble';
     const icon=document.createElement('span');icon.className='file-icon';
     icon.textContent=getFileIcon(msg.fileName);
     const info=document.createElement('div');info.className='file-info';
-    const name=document.createElement('div');name.className='file-name';name.textContent=msg.fileName;
-    const size=document.createElement('div');size.className='file-size';size.textContent=msg.fileSize;
+    const name=document.createElement('div');name.className='file-name';name.textContent=msg.fileName||'file';
+    const size=document.createElement('div');size.className='file-size';size.textContent=msg.fileSize||'';
     const dl=document.createElement('a');dl.className='file-dl';
-    dl.href=msg.fileUrl;dl.target='_blank';dl.textContent='Download';
+    dl.href=src; dl.download=msg.fileName||'file'; dl.textContent='⬇ Download';
     info.appendChild(name);info.appendChild(size);info.appendChild(dl);
     fb.appendChild(icon);fb.appendChild(info);
     bubble.appendChild(fb);
