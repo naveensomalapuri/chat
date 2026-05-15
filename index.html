@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>💋 Velvet Chat</title>
+<title>Velvet Chat</title>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400;1,600&family=Nunito:wght@300;400;500;600&display=swap" rel="stylesheet"/>
 <style>
 :root {
@@ -403,48 +403,48 @@ body::before {
 <!-- ══ LOADING ══ -->
 <div id="loading">
   <div class="spin-ring"></div>
-  <p>Connecting… 💌</p>
+  <p>Connecting…</p>
 </div>
 
 <!-- ══ ENTRY ══ -->
 <div id="entry">
   <div class="entry-logo">
-    <h1>Velvet <em>Chat</em> 💋</h1>
-    <p>Just the two of you 🌹</p>
+    <h1>Velvet <em>Chat</em></h1>
+    <p>Just the two of you</p>
   </div>
   <div class="entry-divider"><span>Choose your identity</span></div>
   <div class="gender-cards">
     <div class="gc male" onclick="choose('male')">
       <span class="gc-icon">👨</span>
       <div class="gc-label">He / Him</div>
-      <div class="gc-sub">💪 🍆 🔥 😈</div>
+      <div class="gc-sub">💪 🔥 😈</div>
       <span class="gc-tag">King 👑</span>
     </div>
     <div class="gc female" onclick="choose('female')">
       <span class="gc-icon">👩</span>
       <div class="gc-label">She / Her</div>
-      <div class="gc-sub">🌹 💅 🍑 💋</div>
+      <div class="gc-sub">🌹 💅 🍑</div>
       <span class="gc-tag">Queen 👸</span>
     </div>
   </div>
-  <p class="entry-note">Both open the same link 🔗<br/>One picks 👨, other picks 👩 — that's it! 💌</p>
+  <p class="entry-note">Both open the same link 🔗<br/>One picks 👨, other picks 👩 — that's it!</p>
 </div>
 
 <!-- ══ WAITING ══ -->
 <div id="waiting">
-  <div class="wait-heart">💋</div>
+  <div class="wait-heart">❤️</div>
   <h2>Waiting for your partner… 🕯️</h2>
   <p>Share this link with them 👇</p>
   <div class="rlbox">
     <input id="room-link" readonly/>
     <button onclick="copyLink()">Copy 🔗</button>
   </div>
-  <p style="color:var(--text3);font-size:0.73rem;margin-top:4px;">They open the link &amp; pick the other gender 💋</p>
+  <p style="color:var(--text3);font-size:0.73rem;margin-top:4px;">They open the link &amp; pick the other gender</p>
 </div>
 
 <!-- ══ CHAT ══ -->
 <div id="chat">
-  <div id="disc-banner">💔 Partner disconnected. Waiting for them to return…</div>
+  <div id="disc-banner">Partner disconnected. Waiting for them to return…</div>
   <div class="chat-header">
     <div class="hav" id="my-av"></div>
     <div class="hinfo">
@@ -454,7 +454,7 @@ body::before {
         <span id="stext">Connected 🔥</span>
       </div>
     </div>
-    <span class="header-logo">Velvet 💋</span>
+    <span class="header-logo">Velvet</span>
     <div class="pside">
       <div class="hav" id="par-av"></div>
       <div class="pchip" id="par-name"></div>
@@ -472,14 +472,15 @@ body::before {
         onkeydown="handleKey(event)"
         oninput="autoResize(this); broadcastLiveTyping();">
       </textarea>
-      <button class="send-btn" onclick="sendMsg()">💌</button>
+      <button class="icon-btn" onclick="clearChat()" title="Clear Chat">🗑️</button>
+      <button class="send-btn" onclick="sendMsg()">➤</button>
     </div>
   </div>
 </div>
 
 <script type="module">
 import { initializeApp }   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getDatabase, ref, set, push, onValue, onDisconnect, serverTimestamp, get }
+import { getDatabase, ref, set, push, remove, onValue, onDisconnect, serverTimestamp, get }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
 // ── Firebase Config ──────────────────────────────────────────
@@ -497,11 +498,10 @@ const db  = getDatabase(app);
 
 // ── Emojis ───────────────────────────────────────────────────
 const EMOJIS = [
-  '😍','😘','😏','😈','🥵','🔥','💋','❤️','💕','💞',
-  '🍑','🍆','🍒','🍓','🌹','🌸','🌺','💐','🫦','👅',
-  '💦','🤤','😻','🥰','😜','🤭','🫣','😩','😮‍💨','🥂',
-  '💅','👑','🍾','🎀','🎁','💎','✨','⭐','🌙','🕯️',
-  '🩷','🩸','👙','🩲','🔞','💏','👫','❤️‍🔥','💌','🫂',
+  '😍','😘','😏','😈','🥵','🔥','❤️','💕','💞','😻',
+  '🍒','🍓','🌹','🌸','🌺','💐','🥂','🎀','🎁','💎',
+  '💦','🤤','🥰','😜','🤭','🫣','😩','😮‍💨','✨','⭐',
+  '💅','👑','🍾','🌙','🕯️','💏','👫','❤️‍🔥','🫂','🩷',
   '💜','💙','🤍','🖤','💪','🙈','😳','🤫','😋','🥴',
   '😵','🤩','🫰','🤙','💯','🎯','🔑','🛏️','🚿','🍫',
 ];
@@ -525,7 +525,7 @@ setTimeout(() => {
 window.choose = async function(gender) {
   const snap = await get(ref(db, `presence/${gender}`));
   if (snap.exists() && snap.val().online) {
-    showToast('This role is already taken! 😅 Use the other one.');
+    showToast('This role is already taken! Use the other one.');
     return;
   }
   myGender = gender;
@@ -592,23 +592,13 @@ function showChatOffline() {
   document.getElementById('waiting').style.display = 'none';
   showEl('chat', true);
   document.getElementById('sdot').className = 'sdot';
-  document.getElementById('stext').textContent = 'Partner offline — messages will be delivered 📩';
-}
-
-function onPartnerJoined() {
-  partnerOn = true;
-  document.getElementById('waiting').style.display = 'none';
-  document.getElementById('disc-banner').classList.remove('show');
-  showEl('chat', true);
-  document.getElementById('sdot').className  = 'sdot on';
-  document.getElementById('stext').textContent = 'Online 🔥';
-  showToast('Partner is online! 🎉💞');
+  document.getElementById('stext').textContent = 'Partner offline — messages will be delivered';
 }
 
 function onPartnerLeft() {
   partnerOn = false;
   document.getElementById('sdot').className  = 'sdot';
-  document.getElementById('stext').textContent = 'Partner offline — messages will be delivered 📩';
+  document.getElementById('stext').textContent = 'Partner offline — messages will be delivered';
   document.getElementById('disc-banner').classList.remove('show');
   hideLiveTyping();
 }
@@ -747,8 +737,18 @@ window.handleKey  = e => { if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();s
 window.autoResize = el => { el.style.height='auto'; el.style.height=Math.min(el.scrollHeight,110)+'px'; };
 window.copyLink   = () => {
   navigator.clipboard.writeText(document.getElementById('room-link').value)
-    .then(()=>showToast('Link copied! 🔗 Share with bae 💌'))
-    .catch(()=>showToast('Copy manually 💌'));
+    .then(()=>showToast('Link copied! Share with your partner.'))
+    .catch(()=>showToast('Copy manually'));
+};
+
+window.clearChat = async function() {
+  if (!confirm('Clear all messages? This cannot be undone.')) return;
+  await remove(ref(db, 'messages'));
+  await set(ref(db, 'livetyping/male'), { text: '', ts: Date.now() });
+  await set(ref(db, 'livetyping/female'), { text: '', ts: Date.now() });
+  renderedKeys.clear();
+  document.getElementById('messages').innerHTML = '';
+  showToast('Chat cleared.');
 };
 
 let toastT;
