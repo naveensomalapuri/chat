@@ -412,6 +412,33 @@ html,body { height:100%; font-family:'Inter',sans-serif; background:var(--bg2); 
 }
 #toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
 
+/* Memory indicator */
+.mem-box {
+  margin:auto 10px 10px;
+  background:var(--surface2); border-radius:10px;
+  padding:10px 12px; border:1px solid var(--border);
+}
+.mem-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; }
+.mem-label { font-size:0.75rem; font-weight:600; color:var(--text2); }
+.mem-val { font-size:0.7rem; color:var(--text3); }
+.mem-bar-bg {
+  height:5px; background:var(--border); border-radius:3px; overflow:hidden; margin-bottom:7px;
+}
+.mem-bar {
+  height:100%; width:0%; border-radius:3px;
+  background:var(--accent); transition:width 0.4s, background 0.4s;
+}
+.mem-bar.warn  { background:#f59e0b; }
+.mem-bar.danger{ background:#ef4444; }
+.mem-footer { display:flex; justify-content:space-between; align-items:center; }
+.mem-footer span { font-size:0.7rem; color:var(--text3); }
+.mem-clear-btn {
+  font-size:0.7rem; font-weight:600; color:var(--accent2);
+  background:none; border:none; cursor:pointer; padding:0;
+  font-family:inherit; transition:color 0.15s;
+}
+.mem-clear-btn:hover { color:#ef4444; }
+
 /* ── MOBILE ── */
 @media(max-width:640px){
   .sidebar {
@@ -484,6 +511,21 @@ html,body { height:100%; font-family:'Inter',sans-serif; background:var(--bg2); 
           <div class="ci-preview" id="ci-preview">No messages yet</div>
         </div>
         <div class="ci-time" id="ci-time"></div>
+      </div>
+
+      <!-- Memory indicator -->
+      <div class="mem-box">
+        <div class="mem-header">
+          <span class="mem-label">💾 Storage</span>
+          <span class="mem-val" id="mem-val">0 KB / 10 MB</span>
+        </div>
+        <div class="mem-bar-bg">
+          <div class="mem-bar" id="mem-bar"></div>
+        </div>
+        <div class="mem-footer">
+          <span id="mem-count">0 messages</span>
+          <button class="mem-clear-btn" onclick="clearChat()">Free memory</button>
+        </div>
       </div>
     </div>
 
@@ -693,7 +735,9 @@ window.choose=function(gender){
   });
 
   onValue(ref(db,'messages'),snap=>{
+    let count=0;
     snap.forEach(child=>{
+      count++;
       if(!renderedKeys.has(child.key)){
         renderedKeys.add(child.key);
         const msg=child.val();
@@ -710,6 +754,8 @@ window.choose=function(gender){
         document.getElementById('ci-time').textContent=fmtTime(msg.time);
       }
     });
+    const bytes=calcMsgBytes(snap);
+    updateMemory(bytes,count);
   });
 
   onValue(ref(db,`livetyping/${other()}`),snap=>{
@@ -942,15 +988,39 @@ function getFileIcon(name){
 
 // Clear
 window.clearChat=async function(){
-  if(!confirm('Clear all messages? This cannot be undone.'))return;
+  if(!confirm('Clear all messages? This will free storage space and cannot be undone.'))return;
   await remove(ref(db,'messages'));
   await set(ref(db,'livetyping/male'),{text:'',ts:Date.now()});
   await set(ref(db,'livetyping/female'),{text:'',ts:Date.now()});
   renderedKeys.clear();lastGender=null;
   document.getElementById('messages').innerHTML='';
   document.getElementById('ci-preview').textContent='No messages yet';
-  showToast('Chat cleared');
+  updateMemory(0,0);
+  showToast('Chat cleared — storage freed');
 };
+
+// Memory calculation
+const DB_LIMIT_BYTES = 10 * 1024 * 1024; // Firebase free tier ~10 MB practical message limit
+
+function calcMsgBytes(snap){
+  // Estimate: JSON stringify the snapshot value
+  try {
+    const json = JSON.stringify(snap.val() || {});
+    return new Blob([json]).size;
+  } catch(e){ return 0; }
+}
+
+function updateMemory(bytes, count){
+  const pct = Math.min((bytes / DB_LIMIT_BYTES) * 100, 100);
+  const bar = document.getElementById('mem-bar');
+  const val = document.getElementById('mem-val');
+  const cnt = document.getElementById('mem-count');
+  if(!bar) return;
+  bar.style.width = pct + '%';
+  bar.className = 'mem-bar' + (pct > 80 ? ' danger' : pct > 50 ? ' warn' : '');
+  val.textContent = fmtSize(bytes) + ' / 10 MB';
+  cnt.textContent = count + ' message' + (count !== 1 ? 's' : '');
+}
 
 // WebRTC
 window.startCall=async function(){
