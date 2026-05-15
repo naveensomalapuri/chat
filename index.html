@@ -299,6 +299,32 @@ html,body { height:100%; font-family:'Inter',sans-serif; background:var(--bg2); 
 .td:nth-child(3){animation-delay:0.4s}
 @keyframes tdot{0%,60%,100%{transform:translateY(0);opacity:0.5}30%{transform:translateY(-5px);opacity:1}}
 
+/* File / image bubbles */
+.bubble img {
+  max-width:100%; max-height:260px; border-radius:8px;
+  display:block; cursor:pointer; object-fit:contain;
+}
+.file-bubble {
+  display:flex; align-items:center; gap:10px; padding:4px 0;
+}
+.file-icon { font-size:1.6rem; flex-shrink:0; }
+.file-info { flex:1; min-width:0; }
+.file-name { font-size:0.82rem; font-weight:500; color:var(--text); word-break:break-all; }
+.file-size { font-size:0.7rem; color:var(--text3); margin-top:1px; }
+.file-dl {
+  display:inline-block; margin-top:6px; font-size:0.75rem; font-weight:600;
+  color:var(--accent2); text-decoration:none; border:1px solid var(--accent);
+  padding:3px 10px; border-radius:12px; transition:background 0.15s;
+}
+.file-dl:hover { background:var(--accent); color:#fff; }
+.upload-progress {
+  height:3px; background:var(--border); border-radius:2px; margin-top:6px; overflow:hidden;
+}
+.upload-bar {
+  height:100%; background:var(--accent); border-radius:2px;
+  transition:width 0.2s; width:0%;
+}
+
 /* System */
 .sys-msg { text-align:center; padding:6px 0; }
 .sys-msg span {
@@ -512,6 +538,8 @@ html,body { height:100%; font-family:'Inter',sans-serif; background:var(--bg2); 
         <div class="input-row">
           <div class="input-inner">
             <button class="emoji-btn" id="etoggle" onclick="toggleEmoji()">😊</button>
+            <button class="emoji-btn" onclick="document.getElementById('file-input').click()" title="Attach file">📎</button>
+            <input type="file" id="file-input" accept="image/*,video/*,.pdf,.doc,.docx,.txt,.zip" style="display:none" onchange="handleFile(event)"/>
             <textarea id="msg-input" rows="1"
               placeholder="Write a message…"
               onkeydown="handleKey(event)"
@@ -659,9 +687,11 @@ window.choose=function(gender){
         renderMsg(msg,isMine);
         if(!isMine){
           playMsgSound();
-          sendBrowserNotif(msg.text,msg.gender);
+          const notifText=msg.fileType?`📎 ${msg.fileName}`:msg.text;
+          sendBrowserNotif(notifText,msg.gender);
         }
-        const prev=(isMine?'You: ':'')+msg.text.slice(0,32)+(msg.text.length>32?'…':'');
+        const prevText=msg.fileType?`📎 ${msg.fileName}`:msg.text;
+        const prev=(isMine?'You: ':'')+prevText.slice(0,32)+(prevText.length>32?'…':'');
         document.getElementById('ci-preview').textContent=prev;
         document.getElementById('ci-time').textContent=fmtTime(msg.time);
       }
@@ -711,7 +741,7 @@ function onPartnerLeft(){
   if(inCall)endCall();
 }
 
-// Send
+// Send text
 window.sendMsg=async function(){
   const inp=document.getElementById('msg-input');
   const text=inp.value.trim();
@@ -721,6 +751,44 @@ window.sendMsg=async function(){
   inp.value='';autoResize(inp);
   if(!partnerOn) showToast('Message sent — delivered when partner comes online');
 };
+
+// File / image upload
+window.handleFile=async function(e){
+  const file=e.target.files[0];
+  if(!file)return;
+  e.target.value='';
+
+  const MAX=5*1024*1024; // 5 MB limit
+  if(file.size>MAX){showToast('File too large — max 5 MB');return;}
+
+  showToast('Uploading…');
+
+  const reader=new FileReader();
+  reader.onload=async ev=>{
+    const dataUrl=ev.target.result;
+    const isImage=file.type.startsWith('image/');
+    const isVideo=file.type.startsWith('video/');
+    const msg={
+      gender:myGender,
+      time:Date.now(),
+      fileType: isImage?'image': isVideo?'video':'file',
+      fileName:file.name,
+      fileSize:fmtSize(file.size),
+      fileData:dataUrl,
+      text:''
+    };
+    await push(ref(db,'messages'),msg);
+    if(!partnerOn) showToast('File sent — delivered when partner comes online');
+    else showToast('File sent');
+  };
+  reader.readAsDataURL(file);
+};
+
+function fmtSize(bytes){
+  if(bytes<1024)return bytes+' B';
+  if(bytes<1024*1024)return (bytes/1024).toFixed(1)+' KB';
+  return (bytes/(1024*1024)).toFixed(1)+' MB';
+}
 
 // Live typing
 window.broadcastLiveTyping=function(){
@@ -772,7 +840,32 @@ function renderMsg(msg,isMine){
   }
 
   const bubble=document.createElement('div');bubble.className='bubble';
-  bubble.innerHTML=escapeHtml(msg.text);
+
+  if(msg.fileType==='image'){
+    const img=document.createElement('img');
+    img.src=msg.fileData;img.alt=msg.fileName;
+    img.onclick=()=>{window.open(msg.fileData,'_blank');};
+    bubble.appendChild(img);
+  } else if(msg.fileType==='video'){
+    const vid=document.createElement('video');
+    vid.src=msg.fileData;vid.controls=true;
+    vid.style.cssText='max-width:100%;max-height:220px;border-radius:8px;display:block;';
+    bubble.appendChild(vid);
+  } else if(msg.fileType==='file'){
+    const fb=document.createElement('div');fb.className='file-bubble';
+    const icon=document.createElement('span');icon.className='file-icon';
+    icon.textContent=getFileIcon(msg.fileName);
+    const info=document.createElement('div');info.className='file-info';
+    const name=document.createElement('div');name.className='file-name';name.textContent=msg.fileName;
+    const size=document.createElement('div');size.className='file-size';size.textContent=msg.fileSize;
+    const dl=document.createElement('a');dl.className='file-dl';
+    dl.href=msg.fileData;dl.download=msg.fileName;dl.textContent='Download';
+    info.appendChild(name);info.appendChild(size);info.appendChild(dl);
+    fb.appendChild(icon);fb.appendChild(info);
+    bubble.appendChild(fb);
+  } else {
+    bubble.innerHTML=escapeHtml(msg.text);
+  }
 
   const meta=document.createElement('div');meta.className='bubble-meta';
   const t=document.createElement('span');t.className='btime';
@@ -787,6 +880,17 @@ function renderMsg(msg,isMine){
 
 function fmtTime(ts){
   return new Date(ts).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+}
+
+function getFileIcon(name){
+  const ext=(name.split('.').pop()||'').toLowerCase();
+  if(['pdf'].includes(ext))return '📄';
+  if(['doc','docx'].includes(ext))return '📝';
+  if(['zip','rar','7z'].includes(ext))return '🗜️';
+  if(['mp3','wav','ogg'].includes(ext))return '🎵';
+  if(['mp4','mov','avi'].includes(ext))return '🎬';
+  if(['txt'].includes(ext))return '📃';
+  return '📎';
 }
 
 // Clear
