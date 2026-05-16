@@ -981,8 +981,12 @@ window.choose=function(gender){
     snap.forEach(child=>{
       count++;
       if(!renderedKeys.has(child.key)){
-        renderedKeys.add(child.key);
         const msg=child.val();
+        if(!msg || !msg.gender || (msg.text == null && !msg.fileType)){
+          renderedKeys.add(child.key);
+          return;
+        }
+        renderedKeys.add(child.key);
         const isMine=msg.gender===myGender;
         renderMsg(msg,isMine,child.key);
         if(!isMine && initialLoadDone && msg.time > joinedAt){
@@ -1232,7 +1236,8 @@ function hideLiveTyping(){
 }
 
 function escapeHtml(s){
-  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
+  if(s == null) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
 }
 
 function fileIconId(name){
