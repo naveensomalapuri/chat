@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
 <title>Velvet</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
 <style>
 :root {
   --bg:          #f7f8fa;
@@ -733,9 +734,14 @@ html,body { height:100%; font-family:'Inter',-apple-system,BlinkMacSystemFont,sa
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getDatabase, ref, set, push, remove, onValue, onDisconnect, serverTimestamp }
+import { getDatabase, ref, set, push, remove, onValue, onDisconnect, serverTimestamp, get }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
+
+// ───── OneSignal config — paste your keys from onesignal.com ─────
+const ONESIGNAL_APP_ID  = "35d752c3-09e3-460a-ab47-c7172dc193f2";
+const ONESIGNAL_REST_KEY = "os_v2_app_gxlvfqyj4ndavk2hy4ls3qmt6lh6cof7tbkezbufmow7u7ztpu5hfdl6khfxd5v4imzmb3usofdpt47c34ohknywcbasbdiiy5yeyei";
+const pushEnabled = () => ONESIGNAL_APP_ID && ONESIGNAL_REST_KEY;
 
 const firebaseConfig = {
   apiKey: "AIzaSyBBF4DHE8jfSGGYVRf9W9MvFwEfW0lZ-jw",
@@ -792,6 +798,61 @@ function requestNotifPermission(){
   }
 }
 
+window.OneSignalDeferred = window.OneSignalDeferred || [];
+function initOneSignal(){
+  if(!pushEnabled()) return;
+  window.OneSignalDeferred.push(async function(OneSignal){
+    try {
+      await OneSignal.init({
+        appId: ONESIGNAL_APP_ID,
+        allowLocalhostAsSecureOrigin: true,
+        promptOptions: {
+          slidedown: {
+            prompts: [{
+              type: "push",
+              autoPrompt: true,
+              text: {
+                actionMessage: "Get notified when your partner messages you",
+                acceptButton: "Allow",
+                cancelButton: "Not now"
+              }
+            }]
+          }
+        }
+      });
+      const saveSub = async () => {
+        const id = OneSignal.User.PushSubscription.id;
+        if(id && myGender) await set(ref(db, `pushSubs/${myGender}`), id);
+      };
+      await saveSub();
+      OneSignal.User.PushSubscription.addEventListener('change', saveSub);
+    } catch(e){}
+  });
+}
+
+async function sendPushToPartner(text){
+  if(!pushEnabled()) return;
+  if(partnerOn) return;
+  try {
+    const snap = await get(ref(db, `pushSubs/${other()}`));
+    const partnerSubId = snap.val();
+    if(!partnerSubId) return;
+    await fetch('https://onesignal.com/api/v1/notifications', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json; charset=utf-8',
+        'Authorization': 'Key ' + ONESIGNAL_REST_KEY,
+      },
+      body: JSON.stringify({
+        app_id: ONESIGNAL_APP_ID,
+        include_subscription_ids: [partnerSubId],
+        headings: { en: 'Velvet' },
+        contents: { en: (text || '').slice(0, 140) },
+      })
+    });
+  } catch(e){}
+}
+
 function sendBrowserNotif(text,fromGender){
   if(!soundOn)return;
   if(document.visibilityState==='visible')return;
@@ -834,6 +895,7 @@ window.choose=function(gender){
   if(window.innerWidth<=640) document.getElementById('sidebar').classList.add('hidden');
 
   requestNotifPermission();
+  initOneSignal();
   const presRef=ref(db,`presence/${gender}`);
   set(presRef,{online:true,ts:serverTimestamp()});
   onDisconnect(presRef).set({online:false,ts:serverTimestamp()});
@@ -949,6 +1011,7 @@ window.sendMsg=async function(){
   inp.focus();
   set(ref(db,`livetyping/${myGender}`),{text:'',ts:Date.now()});
   await push(ref(db,'messages'),{gender:myGender,text,time:Date.now()});
+  sendPushToPartner(text);
   if(!partnerOn) showToast('Sent — will deliver when partner is online');
 };
 
@@ -986,6 +1049,7 @@ window.handleFile=async function(e){
       text:''
     };
     await push(ref(db,'messages'),msg);
+    sendPushToPartner('Sent a ' + (isImage?'photo':isVideo?'video':'file') + ': ' + file.name);
     if(!partnerOn) showToast('Sent — will deliver when partner is online');
     else showToast('Sent');
   } catch(err){
