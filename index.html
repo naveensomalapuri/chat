@@ -999,14 +999,23 @@ window.choose=function(gender){
     updateMemory(bytes,count);
   }
 
-  get(ref(db,'messages')).then(snap => {
-    console.log('[init get] messages count:', snap.numChildren());
-    processMessagesSnap(snap);
-  }).catch(err => {
-    console.error('[init get] error:', err);
-    const detail = err.code || err.message || 'unknown';
+  (async () => {
+    let lastErr = null;
+    for(let i=0; i<5; i++){
+      try {
+        const snap = await get(ref(db,'messages'));
+        console.log(`[init get attempt ${i+1}] success, count:`, snap.numChildren());
+        processMessagesSnap(snap);
+        return;
+      } catch(err){
+        lastErr = err;
+        console.warn(`[init get attempt ${i+1}] failed:`, err.code || err.message);
+        await new Promise(r => setTimeout(r, 700 * (i+1)));
+      }
+    }
+    const detail = (lastErr && (lastErr.code || lastErr.message)) || 'unknown';
     showToast('Cannot load: ' + detail);
-  });
+  })();
 
   onValue(ref(db,'messages'), processMessagesSnap, err => {
     console.error('[onValue] error:', err);
