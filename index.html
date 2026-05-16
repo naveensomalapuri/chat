@@ -1004,7 +1004,8 @@ window.choose=function(gender){
     processMessagesSnap(snap);
   }).catch(err => {
     console.error('[init get] error:', err);
-    showToast('Cannot load messages — check Firebase rules');
+    const detail = err.code || err.message || 'unknown';
+    showToast('Cannot load: ' + detail);
   });
 
   onValue(ref(db,'messages'), processMessagesSnap, err => {
