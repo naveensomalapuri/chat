@@ -788,7 +788,7 @@ let liveTypingEl=null, liveTypingTimer=null, sendStopTimer=null;
 let pc=null, localStream=null;
 let callTimerInt=null, callSeconds=0, isMuted=false, inCall=false, isCallerRole=false;
 let soundOn=true;
-let unreadCount=0, initialLoadDone=false;
+let unreadCount=0, initialLoadDone=false, joinedAt=0;
 
 function bumpUnread(){
   if(document.visibilityState === 'visible' && document.hasFocus()) return;
@@ -958,6 +958,7 @@ window.showSidebar=function(){
 
 window.choose=function(gender){
   myGender=gender;
+  joinedAt=Date.now();
   document.getElementById('entry').style.display='none';
   document.getElementById('app').style.display='block';
   setupUI();
@@ -984,7 +985,7 @@ window.choose=function(gender){
         const msg=child.val();
         const isMine=msg.gender===myGender;
         renderMsg(msg,isMine,child.key);
-        if(!isMine && initialLoadDone){
+        if(!isMine && initialLoadDone && msg.time > joinedAt){
           playMsgSound();
           const notifText=msg.fileType?msg.fileName:msg.text;
           sendBrowserNotif(notifText,msg.gender);
@@ -996,6 +997,9 @@ window.choose=function(gender){
     initialLoadDone = true;
     const bytes=calcMsgBytes(snap);
     updateMemory(bytes,count);
+  }, err => {
+    console.error('Firebase messages read denied:', err);
+    showToast('Cannot read messages — check Firebase rules');
   });
 
   onValue(ref(db,`livetyping/${other()}`),snap=>{
