@@ -210,14 +210,29 @@ html,body { height:100%; font-family:'Inter',-apple-system,BlinkMacSystemFont,sa
 .presence-dot.on { background:var(--online); }
 
 .ci-info { flex:1; min-width:0; }
-.ci-top { display:flex; justify-content:space-between; align-items:baseline; }
+.ci-top { display:flex; justify-content:space-between; align-items:baseline; gap:8px; }
 .ci-name { font-size:0.9rem; font-weight:600; color:var(--text); letter-spacing:-0.01em; }
 .ci-time { font-size:0.7rem; color:var(--text3); flex-shrink:0; font-weight:500; }
+.ci-bottom { display:flex; justify-content:space-between; align-items:center; gap:8px; margin-top:3px; }
 .ci-preview {
-  font-size:0.78rem; color:var(--text3); margin-top:2px;
+  font-size:0.78rem; color:var(--text3);
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
-  display:flex; align-items:center;
+  flex:1; min-width:0;
 }
+.ci-badge {
+  min-width:20px; height:20px; padding:0 6px;
+  background:var(--danger); color:#fff;
+  border-radius:10px;
+  font-size:0.7rem; font-weight:700;
+  display:none; align-items:center; justify-content:center;
+  flex-shrink:0; box-shadow:0 2px 8px rgba(220,38,38,0.4);
+  font-variant-numeric:tabular-nums;
+  animation:badgePop 0.32s cubic-bezier(.18,1.6,.4,1);
+}
+.ci-badge.show { display:flex; }
+@keyframes badgePop { from{transform:scale(0);opacity:0} to{transform:scale(1);opacity:1} }
+.contact-item.has-unread .ci-name { font-weight:700; }
+.contact-item.has-unread .ci-preview { color:var(--text); font-weight:500; }
 
 /* Chat panel */
 .chat-panel {
@@ -613,7 +628,10 @@ html,body { height:100%; font-family:'Inter',-apple-system,BlinkMacSystemFont,sa
               <div class="ci-name" id="ci-name">Partner</div>
               <div class="ci-time" id="ci-time"></div>
             </div>
-            <div class="ci-preview" id="ci-preview">No messages yet</div>
+            <div class="ci-bottom">
+              <div class="ci-preview" id="ci-preview">No messages yet</div>
+              <div class="ci-badge" id="ci-badge">0</div>
+            </div>
           </div>
         </div>
       </div>
@@ -770,20 +788,71 @@ let liveTypingEl=null, liveTypingTimer=null, sendStopTimer=null;
 let pc=null, localStream=null;
 let callTimerInt=null, callSeconds=0, isMuted=false, inCall=false, isCallerRole=false;
 let soundOn=true;
+let unreadCount=0, initialLoadDone=false;
 
+function bumpUnread(){
+  if(document.visibilityState === 'visible' && document.hasFocus()) return;
+  unreadCount++;
+  renderUnread();
+}
+function clearUnread(){
+  if(unreadCount === 0) return;
+  unreadCount = 0;
+  renderUnread();
+}
+function renderUnread(){
+  const badge = document.getElementById('ci-badge');
+  const item  = document.getElementById('contact-item');
+  if(!badge) return;
+  if(unreadCount > 0){
+    badge.textContent = unreadCount > 99 ? '99+' : unreadCount;
+    badge.classList.add('show');
+    item.classList.add('has-unread');
+    document.title = `(${unreadCount}) Velvet`;
+  } else {
+    badge.classList.remove('show');
+    item.classList.remove('has-unread');
+    document.title = 'Velvet';
+  }
+}
+document.addEventListener('visibilitychange', () => {
+  if(document.visibilityState === 'visible') clearUnread();
+});
+window.addEventListener('focus', clearUnread);
+
+let audioCtx = null;
+function getAudioCtx(){
+  if(!audioCtx) audioCtx = new(window.AudioContext||window.webkitAudioContext)();
+  if(audioCtx.state === 'suspended') audioCtx.resume();
+  return audioCtx;
+}
 function playMsgSound(){
-  if(!soundOn)return;
-  try{
-    const ctx=new(window.AudioContext||window.webkitAudioContext)();
-    const o=ctx.createOscillator();
-    const g=ctx.createGain();
-    o.connect(g);g.connect(ctx.destination);
-    o.type='sine';o.frequency.setValueAtTime(880,ctx.currentTime);
-    o.frequency.exponentialRampToValueAtTime(660,ctx.currentTime+0.1);
-    g.gain.setValueAtTime(0.18,ctx.currentTime);
-    g.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+0.3);
-    o.start(ctx.currentTime);o.stop(ctx.currentTime+0.3);
-  }catch(e){}
+  if(!soundOn) return;
+  try {
+    const ctx = getAudioCtx();
+    const now = ctx.currentTime;
+    const master = ctx.createGain();
+    master.gain.value = 0.55;
+    master.connect(ctx.destination);
+
+    const tone = (freq, start, dur, peak, type='sine') => {
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.connect(g); g.connect(master);
+      o.type = type;
+      o.frequency.value = freq;
+      g.gain.setValueAtTime(0.0001, now+start);
+      g.gain.exponentialRampToValueAtTime(peak, now+start+0.012);
+      g.gain.exponentialRampToValueAtTime(0.0001, now+start+dur);
+      o.start(now+start);
+      o.stop(now+start+dur+0.02);
+    };
+
+    tone(1318.51, 0.00, 0.30, 0.55);
+    tone(987.77,  0.10, 0.50, 0.55);
+    tone(2637.02, 0.00, 0.12, 0.18);
+    tone(659.25,  0.10, 0.40, 0.22, 'triangle');
+  } catch(e){}
 }
 
 window.toggleSound=function(){
@@ -915,14 +984,16 @@ window.choose=function(gender){
         const msg=child.val();
         const isMine=msg.gender===myGender;
         renderMsg(msg,isMine,child.key);
-        if(!isMine){
+        if(!isMine && initialLoadDone){
           playMsgSound();
           const notifText=msg.fileType?msg.fileName:msg.text;
           sendBrowserNotif(notifText,msg.gender);
+          bumpUnread();
         }
         updateSidebarPreview(msg,isMine);
       }
     });
+    initialLoadDone = true;
     const bytes=calcMsgBytes(snap);
     updateMemory(bytes,count);
   });
@@ -1219,6 +1290,7 @@ window.clearChat=async function(){
   document.getElementById('messages').innerHTML='';
   document.getElementById('ci-preview').textContent='No messages yet';
   document.getElementById('ci-time').textContent='';
+  clearUnread();
   updateMemory(0,0);
   showToast('Chat cleared');
 };
