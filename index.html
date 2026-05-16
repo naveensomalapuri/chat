@@ -999,22 +999,37 @@ window.choose=function(gender){
     updateMemory(bytes,count);
   }
 
+  function dataToSnapshot(data){
+    return {
+      forEach(cb){
+        if(!data) return;
+        Object.entries(data)
+          .sort((a,b) => (a[1].time||0) - (b[1].time||0))
+          .forEach(([key,val]) => cb({ key, val: () => val }));
+      },
+      numChildren(){ return data ? Object.keys(data).length : 0; },
+      val(){ return data; }
+    };
+  }
+
   (async () => {
-    let lastErr = null;
-    for(let i=0; i<5; i++){
+    try {
+      const res = await fetch(firebaseConfig.databaseURL + '/messages.json', { cache: 'no-store' });
+      if(!res.ok) throw new Error('HTTP ' + res.status);
+      const data = await res.json();
+      console.log('[REST load]', data ? Object.keys(data).length : 0, 'messages');
+      processMessagesSnap(dataToSnapshot(data));
+    } catch(err){
+      console.error('[REST load] error:', err);
       try {
         const snap = await get(ref(db,'messages'));
-        console.log(`[init get attempt ${i+1}] success, count:`, snap.numChildren());
+        console.log('[SDK fallback] count:', snap.numChildren());
         processMessagesSnap(snap);
-        return;
-      } catch(err){
-        lastErr = err;
-        console.warn(`[init get attempt ${i+1}] failed:`, err.code || err.message);
-        await new Promise(r => setTimeout(r, 700 * (i+1)));
+      } catch(err2){
+        console.error('[SDK fallback] error:', err2);
+        showToast('Cannot load: ' + (err.message || err2.message || 'unknown'));
       }
     }
-    const detail = (lastErr && (lastErr.code || lastErr.message)) || 'unknown';
-    showToast('Cannot load: ' + detail);
   })();
 
   onValue(ref(db,'messages'), processMessagesSnap, err => {
