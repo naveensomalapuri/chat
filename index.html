@@ -976,7 +976,7 @@ window.choose=function(gender){
     else{if(partnerOn)onPartnerLeft();}
   });
 
-  onValue(ref(db,'messages'),snap=>{
+  function processMessagesSnap(snap){
     let count=0;
     snap.forEach(child=>{
       count++;
@@ -997,10 +997,21 @@ window.choose=function(gender){
     initialLoadDone = true;
     const bytes=calcMsgBytes(snap);
     updateMemory(bytes,count);
-  }, err => {
-    console.error('Firebase messages read denied:', err);
-    showToast('Cannot read messages — check Firebase rules');
+  }
+
+  get(ref(db,'messages')).then(snap => {
+    console.log('[init get] messages count:', snap.numChildren());
+    processMessagesSnap(snap);
+  }).catch(err => {
+    console.error('[init get] error:', err);
+    showToast('Cannot load messages — check Firebase rules');
   });
+
+  onValue(ref(db,'messages'), processMessagesSnap, err => {
+    console.error('[onValue] error:', err);
+  });
+
+  onValue(ref(db, '.info/connected'), s => console.log('[firebase] connected:', s.val()));
 
   onValue(ref(db,`livetyping/${other()}`),snap=>{
     const v=snap.val();
